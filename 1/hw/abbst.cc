@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+const int N_HEIGHT_START = 0;
 typedef int key_t;
+typedef int height_t;
 typedef int object_t;
 typedef int len_t;
 typedef object_t char_object_t;
@@ -9,8 +12,10 @@ typedef object_t char_object_t;
 typedef struct tr_n_t
 {
     key_t      key;
+	height_t  height;
     struct tr_n_t  *left;
     struct tr_n_t  *right;
+	struct tr_n_t  *parent;
 } tree_node_t;
 
 //typedef   tree_node_t text_t;
@@ -51,7 +56,9 @@ tree_node_t *get_node()
 
 	 tmp->left = NULL;
 	 tmp->right = NULL;
+	 tmp->parent = NULL;
 	 tmp->key = 0;
+	 tmp->height = N_HEIGHT_START;
 
      size_left -= 1;
   }
@@ -79,6 +86,7 @@ tree_node_t *create_tree(void)
    }
    tmp_node->left = NULL;
    tmp_node->right = NULL;
+   tmp_node->parent = NULL;
    tmp_node->key = 0;
    
    return( tmp_node );
@@ -164,12 +172,19 @@ void left_rotation(tree_node_t *n)
 	key_t tmp_key = -1;
 	tmp_node = n->left;
 	tmp_key = n->key;
+
 	n->left = n->right;
+	n->left->parent = n;
 	n->key = n->right->key;
 	n->right = n->left->right;
+	n->right->parent = n;
+
 	n->left->right = n->left->left;
 	n->left->left = tmp_node;
 	n->left->key = tmp_key;
+
+	n->left->left->parent = n->left;
+	n->left->right->parent = n->left;
 }
 
 
@@ -187,11 +202,66 @@ void right_rotation(tree_node_t *n)
 	n->right = n->left;
 	n->key = n->left->key;
 	n->left = n->right->left;
+	n->left->parent = n;
+	n->right->parent = n;
+
 	n->right->left = n->right->right;
 	n->right->right = tmp_node;
 	n->right->key = tmp_key;
+	n->right->right->parent = n->right;
+	n->right->left->parent = n->right;
 }
 
+
+void updateheight(tree_node_t* node,bool brecursive = true)
+{
+	if (NULL == node)
+	{
+		return;
+	}
+	if (NULL == node->right)
+	{
+		node->height = N_HEIGHT_START; //not from 0 .but it doesnt matter.
+	}
+	else
+	{
+		//get maxinum of two children   +1
+		node->height = node->left->height > node->right->height ? node->left->height : node->right->height;
+		node->height++;
+	}
+	if (brecursive)
+	{
+		updateheight(node->parent); // go to parent
+	}
+}
+
+
+void rebalance(tree_node_t* tree)
+{
+	if (NULL == tree)
+	{
+		return;
+	}			  
+	if (NULL == tree->right)
+	{
+		return;
+	}
+	if (tree->right->height - tree->left->height >= 2)
+	{
+		left_rotation(tree);
+		updateheight(tree->left,false);
+		updateheight(tree->right, false);
+		updateheight(tree, false);
+	}
+	else if (tree->left->height - tree->right->height >= 2)
+	{
+		right_rotation(tree);
+		updateheight(tree->left, false);
+		updateheight(tree->right, false);
+		updateheight(tree, false);
+	}
+	rebalance(tree->parent);
+}
 
 
 int insert(tree_node_t *tree, key_t new_key, object_t *new_object)
@@ -205,33 +275,49 @@ int insert(tree_node_t *tree, key_t new_key, object_t *new_object)
    {  
 	  tree->left = (tree_node_t *) new_object;
       tree->key  = new_key;
-      tree->right  = NULL;
+      tree->right  = NULL;	
+	  tree->height = N_HEIGHT_START; //
    }
    else
    {  
 	  tmp_node = tree;
+	  tree_node_t* node_parent = NULL;
+	  int nrotate = 0;
       while( tmp_node->right != NULL )
-      {  
-		  if( new_key < tmp_node->key )
-               tmp_node = tmp_node->left;
-          else
-               tmp_node = tmp_node->right;
+      {   
+		  node_parent = tmp_node;
+		  if (new_key < tmp_node->key)
+		  {
+			  nrotate = tmp_node->right->right == NULL ? 1 : 0;	   //right rotate
+			  tmp_node = tmp_node->left;
+		  }
+		  else
+		  {
+			  nrotate = tmp_node->left->right == NULL ? -1 : 0;	 //left rotate
+			  tmp_node = tmp_node->right;
+		  }
       }
       /* found the candidate leaf. Test whether key distinct */
       if( tmp_node->key == new_key )
          return( -1 );
       /* key is distinct, now perform the insert */
-      {  tree_node_t *old_leaf, *new_leaf;
+      { 
+		 tree_node_t *old_leaf, *new_leaf;
          old_leaf = get_node();
          old_leaf->left = tmp_node->left;
          old_leaf->key = tmp_node->key;
+		 old_leaf->parent = tmp_node;
          old_leaf->right  = NULL;
+
          new_leaf = get_node();
          new_leaf->left = (tree_node_t *) new_object;
          new_leaf->key = new_key;
          new_leaf->right  = NULL;
+		 new_leaf->parent = tmp_node;
+
          if( tmp_node->key < new_key )
-         {   tmp_node->left  = old_leaf;
+         {   
+			 tmp_node->left  = old_leaf;
              tmp_node->right = new_leaf;
              tmp_node->key = new_key;
          }
@@ -239,6 +325,8 @@ int insert(tree_node_t *tree, key_t new_key, object_t *new_object)
          {   tmp_node->left  = new_leaf;
              tmp_node->right = old_leaf;
          }
+		 updateheight(tmp_node);
+		 rebalance(tmp_node);
       }
    }
    return( 0 );
@@ -596,7 +684,7 @@ int main()
 						break;
 				case 3:
 						{
-							char* p = delete_line(searchtree, i-j);
+							char* p = delete_line(searchtree, length_text(searchtree) - rand() % 10);
 							printf("delete_line at %d with %s\n", i - j, (p == NULL) ? "null" : p);
 						}
 					break;
