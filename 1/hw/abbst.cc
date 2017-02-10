@@ -212,6 +212,26 @@ void right_rotation(tree_node_t *n)
 	n->right->left->parent = n->right;
 }
 
+void rebalance(tree_node_t* tree)
+{
+	if (NULL == tree)
+	{
+		return;
+	}
+	if (NULL == tree->right)
+	{
+		return;
+	}
+	if (tree->right->height - tree->left->height >= 2)
+	{
+		left_rotation(tree);
+	
+	}
+	else if (tree->left->height - tree->right->height >= 2)
+	{
+		right_rotation(tree);
+	}
+}
 
 void updateheight(tree_node_t* node,bool brecursive = true)
 {
@@ -225,7 +245,12 @@ void updateheight(tree_node_t* node,bool brecursive = true)
 	}
 	else
 	{
-		//get maxinum of two children   +1
+		if ((node->left->height - node->right->height >= 2) || (node->right->height - node->left ->height >= 2))
+		{
+			rebalance(node);
+			updateheight(node->left, false);
+			updateheight(node->right, false);
+		}
 		node->height = node->left->height > node->right->height ? node->left->height : node->right->height;
 		node->height++;
 	}
@@ -233,34 +258,6 @@ void updateheight(tree_node_t* node,bool brecursive = true)
 	{
 		updateheight(node->parent); // go to parent
 	}
-}
-
-
-void rebalance(tree_node_t* tree)
-{
-	if (NULL == tree)
-	{
-		return;
-	}			  
-	if (NULL == tree->right)
-	{
-		return;
-	}
-	if (tree->right->height - tree->left->height >= 2)
-	{
-		left_rotation(tree);
-		updateheight(tree->left,false);
-		updateheight(tree->right, false);
-		updateheight(tree, false);
-	}
-	else if (tree->left->height - tree->right->height >= 2)
-	{
-		right_rotation(tree);
-		updateheight(tree->left, false);
-		updateheight(tree->right, false);
-		updateheight(tree, false);
-	}
-	rebalance(tree->parent);
 }
 
 
@@ -326,7 +323,6 @@ int insert(tree_node_t *tree, key_t new_key, object_t *new_object)
              tmp_node->right = old_leaf;
          }
 		 updateheight(tmp_node);
-		 rebalance(tmp_node);
       }
    }
    return( 0 );
