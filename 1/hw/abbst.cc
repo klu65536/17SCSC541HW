@@ -196,7 +196,7 @@ void right_rotation(tree_node_t *n)
 	}
 	tree_node_t *tmp_node = 0;
 	key_t tmp_key = -1;
-	tmp_node = n->left;
+	tmp_node = n->right;
 	tmp_key = n->key;
 
 	n->right = n->left;
@@ -235,6 +235,31 @@ void rebalance(tree_node_t* tree)
 
 void updateheight(tree_node_t* node,bool brecursive = true)
 {
+	do 
+	{
+		if (NULL == node)
+		{
+			return;
+		}
+		if (NULL == node->right)
+		{
+			node->height = N_HEIGHT_START; //not from 0 .but it doesnt matter.
+		}
+		else
+		{
+			if ((node->left->height - node->right->height >= 2) || (node->right->height - node->left->height >= 2))
+			{
+				rebalance(node);
+				updateheight(node->left, false);
+				updateheight(node->right, false);
+			}
+			node->height = node->left->height > node->right->height ? node->left->height : node->right->height;
+			node->height++;
+		}
+		node = node->parent;
+	} while (brecursive);
+
+	/*
 	if (NULL == node)
 	{
 		return;
@@ -258,6 +283,7 @@ void updateheight(tree_node_t* node,bool brecursive = true)
 	{
 		updateheight(node->parent); // go to parent
 	}
+	*/
 }
 
 
@@ -328,37 +354,46 @@ int insert(tree_node_t *tree, key_t new_key, object_t *new_object)
    return( 0 );
 }
 
-object_t *_delete(tree_node_t *tree, key_t delete_key)
+tree_node_t *_delete(tree_node_t *tree, key_t delete_key)
 { 
 	if (NULL == tree)
 	{
 		return NULL;
 	}
+   tree_node_t* parent = NULL;
    tree_node_t *tmp_node, *upper_node, *other_node;
    object_t *deleted_object = NULL;
-   if( tree->left == NULL )
-      return( NULL );
+   if (tree->left == NULL)		 //invalid root
+   {
+	   return(parent);
+   }
    else if( tree->right == NULL )
    {  
-	  if(  tree->key == delete_key )
-      {  deleted_object = (object_t *) tree->left;
-         tree->left = NULL;
-         return( deleted_object );
+	  if(  tree->key == delete_key )  //leaf 
+      {  
+		  deleted_object = (object_t *) tree->left;
+          tree->left = NULL;
+         return(tree);
       }
-      else
-         return( NULL );
+	  else
+	  {
+		  return(NULL);		   //invalid key
+	  }
    }
    else
-   {  tmp_node = tree;
+   { 
+	   tmp_node = tree;
       while( tmp_node->right != NULL )
       {   
 		  upper_node = tmp_node;
           if( delete_key < tmp_node->key )
-          {  tmp_node   = upper_node->left;
-             other_node = upper_node->right;
+          {  
+			  tmp_node   = upper_node->left;
+              other_node = upper_node->right;
           }
           else
-          {  tmp_node   = upper_node->right;
+          { 
+			 tmp_node   = upper_node->right;
              other_node = upper_node->left;
           }
       }
@@ -374,7 +409,8 @@ object_t *_delete(tree_node_t *tree, key_t delete_key)
          deleted_object = (object_t *) tmp_node->left;
          return_node( tmp_node );
          return_node( other_node );
-         return( deleted_object );
+
+         return(upper_node);	 //return last node
       }
    }
 }
@@ -620,21 +656,23 @@ char * delete_line(text_t *txt, int index)
 	{
 		return NULL;
 	}
-	object_t* pLast = find_iterative(txt->_text, index);
-	if (NULL == pLast)
+	object_t* pDel = find_iterative(txt->_text, index);
+	if (NULL == pDel)
 	{
 		return NULL;
 	}
-	object_t* ptmp = pLast;
-	object_t* pNext = pLast;
+	object_t* pLast = pDel;
+	object_t* pNext = pDel;
 	while (NULL != pNext)
 	{
 		index++;
 		pNext = find_iterative(txt->_text, index);
 		pLast = pNext;
 	}
-	_delete(txt->_text, (key_t)(length_text(txt)));
-	return (char*)ptmp;
+	tree_node_t * pLastone =  _delete(txt->_text, (key_t)(length_text(txt)));
+	updateheight(pLastone);
+
+	return (char*)pDel;
 }
 
 ///end
@@ -651,11 +689,12 @@ int main()
 	printf("In the following, the key n is associated wth the objecct 10n+2\n");
 	while ((nextop = getchar()) != 'q')
 	{
-		if (nextop == 'i')
+		
+		if (nextop == 'r')
 		{
-			for (int i = 1; i <= 1000; i++)
+			for (int i = 1; i <= 10000; i++)
 			{
-				char *sz = (char*)malloc(sizeof(char)*8);
+				char *sz = (char*)malloc(sizeof(char) * 8);
 				sprintf(sz, "line%d", i);
 				int j = rand()% 10;
 				switch (j)
@@ -691,6 +730,21 @@ int main()
 					}
 					break;
 				}
+			}
+		}
+		else if (nextop == 'd')
+		{
+			for (int i = 0; i < 16; i++)
+			{
+				char *sz = (char*)malloc(sizeof(char) * 8);
+				sprintf(sz, "line%d", i+1);
+				append_line(searchtree, sz);
+				printf("appended_line  at %d  with %s \n", length_text(searchtree), sz);
+			}
+			for (int j=16; j >0;j--)
+			{
+				char* p = delete_line(searchtree,j);
+				printf("delete_line at %d with %s\n", j , (p == NULL) ? "null" : p);
 			}
 		}
 	}
